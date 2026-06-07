@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Volume2, VolumeX, Play, Pause, Music, Sparkles } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, Music, Sparkles, Tv, X } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -14,6 +14,7 @@ export default function AudioPlayer() {
   const [volume, setVolume] = useState(0.4); // Default volume level (0.0 to 1.0)
   const [blockedByBrowser, setBlockedByBrowser] = useState(false);
   const [visualizerBars, setVisualizerBars] = useState<number[]>([4, 4, 4, 4]);
+  const [showVideo, setShowVideo] = useState(true);
 
   // YouTube API Player and state references
   const playerRef = useRef<any>(null);
@@ -248,15 +249,42 @@ export default function AudioPlayer() {
   return (
     <>
       {/* 
-        Off-Screen active canvas layer for iframe render. 
-        Positioned away from visible viewport but kept active so the browser doesn't throttle resource cycles.
+        Interactive YouTube Player Box.
+        Rendered on-screen in a responsive, gorgeous floating theater.
+        When minimized (showVideo is false), it is styled with 20px/20px opacity-0.05 to continuously play audio without browser background thread stalling.
       */}
       <div
         id="yt-player-container"
-        className="pointer-events-none absolute select-none"
-        style={{ width: '1px', height: '1px', left: '-9999px', top: '-9999px', opacity: 0.001 }}
+        className={`fixed z-40 transition-all duration-300 bg-[#052b21] rounded-2xl border border-gold-royal/30 p-2 shadow-[0_10px_40px_rgba(0,0,0,0.6)] ${
+          showVideo 
+            ? 'bottom-24 right-6 w-64 sm:w-72 opacity-100 scale-100 translate-y-0' 
+            : 'fixed bottom-24 right-6 w-[20px] h-[20px] opacity-0.05 pointer-events-none scale-50'
+        }`}
       >
-        <div id="wedding-invitation-yt-player" />
+        {showVideo && (
+          <div className="flex items-center justify-between text-[11px] text-gold-bright font-display uppercase tracking-widest px-1 pb-1.5 border-b border-gold-royal/20 mb-1.5">
+            <span className="flex items-center gap-1.5 font-bold">
+              <Tv className="w-4 h-4 text-gold-royal animate-pulse" /> Royal Sangeet Video
+            </span>
+            <button
+              onClick={() => setShowVideo(false)}
+              className="text-slate-400 hover:text-gold-bright transition text-sm font-bold bg-[#031410] border border-gold-royal/10 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer"
+              title="Minimize Video Player"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
+        <div className={`relative overflow-hidden rounded-xl bg-black/80 aspect-video ${!showVideo ? 'w-2 h-2' : 'w-full'}`}>
+          <div id="wedding-invitation-yt-player" className="w-full h-full" />
+        </div>
+
+        {showVideo && (
+          <p className="text-[9px] text-slate-400 text-center font-mono italic mt-1.5">
+            ✨ Playing traditional music from 01:00
+          </p>
+        )}
       </div>
 
       {/* 1. AUTOPLAY BLOCKED DETECTED BACKUP OVERLAY (Pulsing traditional badge, tap to start) */}
@@ -281,7 +309,7 @@ export default function AudioPlayer() {
       {/* 2. FLOATING REAL-TIME MUSIC CONTROLLER IN BOTTOM-RIGHT CORNER */}
       <div 
         id="floating-audio-control"
-        className="fixed bottom-6 right-6 z-50 bg-[#052b21]/95 border border-gold-royal/40 rounded-full py-2.5 px-4 shadow-[0_6px_35px_rgba(0,0,0,0.5)] flex items-center gap-3.5 backdrop-blur-md hover:border-gold-royal transition-all duration-300"
+        className="fixed bottom-6 right-6 z-50 bg-[#052b21]/95 border border-gold-royal/40 rounded-full py-2.5 px-4 shadow-[0_6px_35px_rgba(0,0,0,0.5)] flex items-center gap-3 md:gap-3.5 backdrop-blur-md hover:border-gold-royal transition-all duration-300 font-sans"
       >
         {/* Play/Pause Button */}
         <button
@@ -290,6 +318,19 @@ export default function AudioPlayer() {
           title={isPlaying ? 'Pause Instrumental Music' : 'Play Instrumental Music'}
         >
           {isPlaying ? <Pause className="w-4 h-4 text-emerald-deep" /> : <Play className="w-4 h-4 fill-emerald-deep text-emerald-deep" />}
+        </button>
+
+        {/* Video Player Display Toggle */}
+        <button
+          onClick={() => setShowVideo(!showVideo)}
+          className={`p-1.5 rounded-full border transition cursor-pointer ${
+            showVideo 
+              ? 'border-gold-royal/40 text-gold-bright bg-gold-royal/10' 
+              : 'border-slate-500/30 text-slate-400 hover:border-gold-royal/30'
+          }`}
+          title={showVideo ? "Minimize Video Display" : "Show Video Display"}
+        >
+          <Tv className="w-3.5 h-3.5" />
         </button>
 
         {/* Animated Sound Waves Visualizer SVG when actively playing */}
