@@ -1,0 +1,6 @@
+{
+  "name": "Islamic Digital Wedding Invitation",
+  "description": "An ultra-premium bilingual (Bangla & English) Islamic Digital Wedding Invitation Card featuring rich emerald green velvet texture, glowing royal gold Arabesque designs, and social media export options.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
