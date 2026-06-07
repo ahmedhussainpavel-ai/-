@@ -80,6 +80,66 @@ export default function InvitationCard({ data, lang, theme, cardRef }: Invitatio
 
   const hex = getThemeHexStyles();
 
+  const [timeLeft, setTimeLeft] = React.useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    isCompleted: false,
+  });
+
+  React.useEffect(() => {
+    // 2026-06-19T11:30:00+06:00 is Bangladesh local wedding date
+    const targetDate = new Date('2026-06-19T11:30:00+06:00').getTime();
+
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime();
+      const difference = targetDate - now;
+
+      if (difference <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isCompleted: true });
+        return;
+      }
+
+      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+      setTimeLeft({ days, hours, minutes, seconds, isCompleted: false });
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const getLabel = (unit: 'days' | 'hours' | 'minutes' | 'seconds') => {
+    if (lang === 'bn') {
+      switch (unit) {
+        case 'days': return 'দিন';
+        case 'hours': return 'ঘণ্টা';
+        case 'minutes': return 'মি.';
+        case 'seconds': return 'সে.';
+      }
+    } else if (lang === 'bilingual') {
+      switch (unit) {
+        case 'days': return 'd/দিন';
+        case 'hours': return 'h/ঘণ্টা';
+        case 'minutes': return 'm/মি.';
+        case 'seconds': return 's/সে.';
+      }
+    } else {
+      switch (unit) {
+        case 'days': return 'd';
+        case 'hours': return 'h';
+        case 'minutes': return 'm';
+        case 'seconds': return 's';
+      }
+    }
+  };
+
   // Helper for conditional rendering based on language mode
   const renderEn = (node: React.ReactNode) => (lang === 'en' || lang === 'bilingual' ? node : null);
   const renderBn = (node: React.ReactNode) => (lang === 'bn' || lang === 'bilingual' ? node : null);
@@ -158,6 +218,58 @@ export default function InvitationCard({ data, lang, theme, cardRef }: Invitatio
             {data.bismillahBn}
           </p>
         )}
+
+        {/* Royal Countdown Timer */}
+        <div className="mt-2.5 flex items-center justify-center">
+          {timeLeft.isCompleted ? (
+            <div className="px-3 py-1.5 rounded-full border text-[9px] uppercase tracking-wider font-semibold animate-pulse-gold" 
+                 style={{ backgroundColor: hex.badgeBg, borderColor: hex.borderColor, color: hex.brightColor }}>
+              ✨ {lang === 'bn' ? 'শুভ বিবাহের পবিত্র সময় উপস্থিত!' : lang === 'bilingual' ? 'Wedding Day Arrived / বিবাহের শুভ ক্ষণ!' : 'The Auspicious Wedding Day has Arrived!'} ✨
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-[#031410]/45 px-3 py-1 rounded-full border text-[9px] font-sans" 
+                 style={{ borderColor: hex.innerBorderColor }}>
+              <span className="text-[8px] uppercase tracking-wider font-semibold mr-1" style={{ color: hex.slate400 }}>
+                {lang === 'bn' ? 'বাকি:' : lang === 'bilingual' ? 'Countdown / বাকি:' : 'Countdown:'}
+              </span>
+              <div className="flex items-center gap-1.5 font-semibold text-[10px] sm:text-xs">
+                <span className="font-mono font-bold text-gold-bright" style={{ color: hex.brightColor }}>
+                  {timeLeft.days.toString().padStart(2, '0')}
+                </span>
+                <span className="text-[8px] text-slate-400 font-medium" style={{ color: hex.slate400 }}>
+                  {getLabel('days')}
+                </span>
+                
+                <span style={{ color: hex.innerBorderColor }} className="text-[10px] sm:text-xs">:</span>
+                
+                <span className="font-mono font-bold text-gold-bright" style={{ color: hex.brightColor }}>
+                  {timeLeft.hours.toString().padStart(2, '0')}
+                </span>
+                <span className="text-[8px] text-slate-400 font-medium" style={{ color: hex.slate400 }}>
+                  {getLabel('hours')}
+                </span>
+                
+                <span style={{ color: hex.innerBorderColor }} className="text-[10px] sm:text-xs">:</span>
+                
+                <span className="font-mono font-bold text-gold-bright" style={{ color: hex.brightColor }}>
+                  {timeLeft.minutes.toString().padStart(2, '0')}
+                </span>
+                <span className="text-[8px] text-slate-400 font-medium" style={{ color: hex.slate400 }}>
+                  {getLabel('minutes')}
+                </span>
+
+                <span style={{ color: hex.innerBorderColor }} className="text-[10px] sm:text-xs">:</span>
+
+                <span className="font-mono font-bold text-gold-royal animate-pulse" style={{ color: hex.goldColor }}>
+                  {timeLeft.seconds.toString().padStart(2, '0')}
+                </span>
+                <span className="text-[8px] text-slate-400 font-medium animate-pulse" style={{ color: hex.slate400 }}>
+                  {getLabel('seconds')}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modern Center Arch Overlay (Details Box) */}

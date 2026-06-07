@@ -31,7 +31,9 @@ export default function ControlPanel({
     }
   }, []);
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const shareUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${window.location.pathname}?invite=true&theme=${theme}`
+    : '';
   
   const shareText = `🌸 মোঃ আতাউর রহমান ও মাহদিয়া আক্তার এর শুভ বিবাহ (নিকাহ) অনুষ্ঠানে আপনাকে সপরিবারে আমন্ত্রণ জানাচ্ছি। 💖
 
