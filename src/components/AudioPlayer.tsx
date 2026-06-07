@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Volume2, VolumeX, Play, Pause, Music, Sparkles, Tv, X } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, Music, Sparkles } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -11,10 +11,9 @@ declare global {
 export default function AudioPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(0.4); // Default volume level (0.0 to 1.0)
+  const [volume, setVolume] = useState(0.4); // Volume level from 0.0 to 1.0
   const [blockedByBrowser, setBlockedByBrowser] = useState(false);
   const [visualizerBars, setVisualizerBars] = useState<number[]>([4, 4, 4, 4]);
-  const [showVideo, setShowVideo] = useState(true);
 
   // YouTube API Player and state references
   const playerRef = useRef<any>(null);
@@ -42,7 +41,7 @@ export default function AudioPlayer() {
     };
   }, [isPlaying, isMuted]);
 
-  // programmatically fade the player volume
+  // Programmatically fade the player volume to sound premium and soft
   const fadeVolume = (from: number, to: number, duration: number, onComplete?: () => void) => {
     if (!playerRef.current || !isPlayerReadyRef.current) {
       onComplete?.();
@@ -110,7 +109,7 @@ export default function AudioPlayer() {
           setIsPlaying(false);
         });
       } else {
-        // Smooth fade-in
+        // Set first play seek
         if (isFirstPlayRef.current) {
           playerRef.current.seekTo(60);
           isFirstPlayRef.current = false;
@@ -145,23 +144,20 @@ export default function AudioPlayer() {
             iv_load_policy: 3,
             disablekb: 1,
             fs: 0,
-            start: 60,
-            origin: window.location.origin,
+            start: 60, // Starts at 60 seconds natively
           },
           events: {
             onReady: (event: any) => {
               isPlayerReadyRef.current = true;
-              event.target.setVolume(0);
-              
-              // Move playhead directly to 60 seconds
-              event.target.seekTo(60);
+              event.target.setVolume(0); // Autoplay must always be muted initially to prevent browser blocking
+              event.target.seekTo(60);   // Seek to the 60-second mark
               
               // Attempt autoplay with brief delay
               setTimeout(() => {
                 try {
                   event.target.playVideo();
                   
-                  // Check if browser allows autoplay
+                  // Verification fallback check
                   setTimeout(() => {
                     if (playerRef.current) {
                       const state = playerRef.current.getPlayerState();
@@ -170,15 +166,14 @@ export default function AudioPlayer() {
                         setBlockedByBrowser(true);
                         setIsPlaying(false);
                       } else {
-                        // Autoplay succeeded! Programmatically fade in to starting volume
-                        setBlockedByBrowser(false);
-                        setIsPlaying(true);
-                        fadeVolume(0, Math.round(volume * 100), 1600);
+                        // Successfully autoplayed. We now prompt the user to act or unmute
+                        // Since most modern browsers block silent unmuting on load, we show the prompt to grant a reliable audio experience.
+                        setBlockedByBrowser(true);
                       }
                     }
                   }, 1200);
                 } catch (autoplayErr) {
-                  console.warn('Autoplay failed or was blocked by browser:', autoplayErr);
+                  console.warn('Autoplay block:', autoplayErr);
                   setBlockedByBrowser(true);
                   setIsPlaying(false);
                 }
@@ -188,12 +183,15 @@ export default function AudioPlayer() {
               // 1 = playing, 2 = paused, 0 = ended
               const playerState = event.data;
               if (playerState === 1) {
-                setIsPlaying(true);
-                setBlockedByBrowser(false);
+                // Keep states synchronized
+                if (playerRef.current.getVolume() > 0) {
+                  setIsPlaying(true);
+                  setBlockedByBrowser(false);
+                }
               } else if (playerState === 2) {
                 setIsPlaying(false);
               } else if (playerState === 0) {
-                // Keep video looping seamlessly starting from 1 minute (60 seconds)
+                // Loop back to 60 seconds
                 event.target.seekTo(60);
                 event.target.playVideo();
               }
@@ -205,7 +203,9 @@ export default function AudioPlayer() {
       }
     };
 
-    // Global initializer function callback or script injector
+    // Robust Polling Script loader to ensure clean execution whenever API finishes loading
+    let checkYT: any = null;
+
     if (window.YT && window.YT.Player) {
       onYTReady();
     } else {
@@ -213,15 +213,9 @@ export default function AudioPlayer() {
         window.onYouTubeIframeAPIReady = () => {
           onYTReady();
         };
-      } else {
-        const previousReady = window.onYouTubeIframeAPIReady;
-        window.onYouTubeIframeAPIReady = () => {
-          previousReady();
-          onYTReady();
-        };
       }
 
-      // Check if the script template is already parsed
+      // Check if tag is injected, if not inject it
       if (!document.getElementById('yt-iframe-api-script')) {
         const tag = document.createElement('script');
         tag.id = 'yt-iframe-api-script';
@@ -229,10 +223,18 @@ export default function AudioPlayer() {
         const firstScript = document.getElementsByTagName('script')[0];
         firstScript.parentNode?.insertBefore(tag, firstScript);
       }
+
+      // Fallback polling for maximum reliability on hot-reloaded dev sessions
+      checkYT = setInterval(() => {
+        if (window.YT && window.YT.Player) {
+          clearInterval(checkYT);
+          onYTReady();
+        }
+      }, 200);
     }
 
     return () => {
-      // Clear timers and release players properly
+      if (checkYT) clearInterval(checkYT);
       if (fadeIntervalRef.current) {
         clearInterval(fadeIntervalRef.current);
       }
@@ -240,7 +242,7 @@ export default function AudioPlayer() {
         try {
           playerRef.current.destroy();
         } catch (e) {
-          // Swallow lifecycle destroy error if already deleted
+          // Swallow any cleanup release errors
         }
       }
     };
@@ -249,57 +251,42 @@ export default function AudioPlayer() {
   return (
     <>
       {/* 
-        Interactive YouTube Player Box.
-        Rendered on-screen in a responsive, gorgeous floating theater.
-        When minimized (showVideo is false), it is styled with 20px/20px opacity-0.05 to continuously play audio without browser background thread stalling.
+        PREMIUM SOUND FIX: Hidden standard-sized offscreen container.
+        YouTube requires standard size (like 320x180) to be active. 
+        Shrinking it to 0px or 1px triggers modern anti-clickjacking and pauses video automatically.
+        Placing it outside visible borders keeps it fully operational and playing clean digital audio!
       */}
       <div
         id="yt-player-container"
-        className={`fixed z-40 transition-all duration-300 bg-[#052b21] rounded-2xl border border-gold-royal/30 p-2 shadow-[0_10px_40px_rgba(0,0,0,0.6)] ${
-          showVideo 
-            ? 'bottom-24 right-6 w-64 sm:w-72 opacity-100 scale-100 translate-y-0' 
-            : 'fixed bottom-24 right-6 w-[20px] h-[20px] opacity-0.05 pointer-events-none scale-50'
-        }`}
+        className="pointer-events-none fixed selection-none"
+        style={{
+          width: '320px',
+          height: '180px',
+          top: '-1000px',
+          left: '-1000px',
+          opacity: 0,
+          zIndex: -9999,
+        }}
       >
-        {showVideo && (
-          <div className="flex items-center justify-between text-[11px] text-gold-bright font-display uppercase tracking-widest px-1 pb-1.5 border-b border-gold-royal/20 mb-1.5">
-            <span className="flex items-center gap-1.5 font-bold">
-              <Tv className="w-4 h-4 text-gold-royal animate-pulse" /> Royal Sangeet Video
-            </span>
-            <button
-              onClick={() => setShowVideo(false)}
-              className="text-slate-400 hover:text-gold-bright transition text-sm font-bold bg-[#031410] border border-gold-royal/10 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer"
-              title="Minimize Video Player"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        <div className={`relative overflow-hidden rounded-xl bg-black/80 aspect-video ${!showVideo ? 'w-2 h-2' : 'w-full'}`}>
-          <div id="wedding-invitation-yt-player" className="w-full h-full" />
-        </div>
-
-        {showVideo && (
-          <p className="text-[9px] text-slate-400 text-center font-mono italic mt-1.5">
-            ✨ Playing traditional music from 01:00
-          </p>
-        )}
+        <div id="wedding-invitation-yt-player" />
       </div>
 
-      {/* 1. AUTOPLAY BLOCKED DETECTED BACKUP OVERLAY (Pulsing traditional badge, tap to start) */}
-      {blockedByBrowser && !isPlaying && (
+      {/* 1. AUTOPLAY PROMPT OVERLAY BAR (Pulsing luxury design modal, grants audio permissions instantly) */}
+      {blockedByBrowser && (
         <div id="autoplay-music-prompt-bar" className="fixed bottom-24 right-4 z-50 max-w-sm animate-bounce">
           <button
-            onClick={handleTogglePlayback}
-            className="flex items-center gap-3 bg-[#0d5945] border-2 border-gold-royal text-gold-bright font-display text-xs p-3 rounded-xl shadow-[0_4px_30px_rgba(212,175,55,0.4)] hover:brightness-110 active:scale-95 transition cursor-pointer"
+            onClick={() => {
+              handleTogglePlayback();
+              setBlockedByBrowser(false);
+            }}
+            className="flex items-center gap-3 bg-[#0d5945] border-2 border-gold-royal text-gold-bright font-display text-xs p-3.5 rounded-xl shadow-[0_4px_30px_rgba(212,175,55,0.4)] hover:brightness-110 active:scale-95 transition cursor-pointer"
           >
             <div className="bg-gold-royal text-emerald-deep p-1.5 rounded-full animate-spin">
               <Music className="w-4 h-4" />
             </div>
             <div className="text-left font-serif pr-1">
-              <p className="font-bold text-gold-bright text-[11px] sm:text-xs">Tap to Play Wedding Music</p>
-              <p className="text-[10px] text-slate-350 mt-0.5">ঐতিহ্যবাহী বিয়ের সানাই সুর শুনতে ক্লিক করুন</p>
+              <p className="font-bold text-gold-bright text-[11px] sm:text-xs">🔊 Tap to Play Royal Wedding Music</p>
+              <p className="text-[10px] text-slate-350 mt-0.5">ঐতিহ্যবাহী বিয়ের মধুর সানাই সুর শুনতে ক্লিক করুন</p>
             </div>
             <Sparkles className="w-4 h-4 text-gold-bright animate-star-pulse" />
           </button>
@@ -318,19 +305,6 @@ export default function AudioPlayer() {
           title={isPlaying ? 'Pause Instrumental Music' : 'Play Instrumental Music'}
         >
           {isPlaying ? <Pause className="w-4 h-4 text-emerald-deep" /> : <Play className="w-4 h-4 fill-emerald-deep text-emerald-deep" />}
-        </button>
-
-        {/* Video Player Display Toggle */}
-        <button
-          onClick={() => setShowVideo(!showVideo)}
-          className={`p-1.5 rounded-full border transition cursor-pointer ${
-            showVideo 
-              ? 'border-gold-royal/40 text-gold-bright bg-gold-royal/10' 
-              : 'border-slate-500/30 text-slate-400 hover:border-gold-royal/30'
-          }`}
-          title={showVideo ? "Minimize Video Display" : "Show Video Display"}
-        >
-          <Tv className="w-3.5 h-3.5" />
         </button>
 
         {/* Animated Sound Waves Visualizer SVG when actively playing */}
